@@ -1,0 +1,118 @@
+'use strict';
+
+const LOCALE = (document.documentElement.lang || 'en').toLowerCase();
+const MESSAGES = {
+  en: {invalid:'Please complete all three fields with a valid email address.', preview:'This is a local design preview. No enquiry was sent or stored.', opened:'Your email application should open with a prepared enquiry. Please send it from there.', photograph:' photograph', photographs:' photographs', menuOpen:'Open navigation', menuClose:'Close navigation'},
+  es: {invalid:'Complete los tres campos e indique un correo electr\u00f3nico v\u00e1lido.', preview:'Esta es una vista previa local. No se ha enviado ni guardado ninguna consulta.', opened:'Se abrir\u00e1 su aplicaci\u00f3n de correo con el mensaje preparado. Env\u00edelo desde all\u00ed.', photograph:' fotograf\u00eda', photographs:' fotograf\u00edas', menuOpen:'Abrir men\u00fa', menuClose:'Cerrar men\u00fa'},
+  de: {invalid:'Bitte f\u00fcllen Sie alle drei Felder aus und geben Sie eine g\u00fcltige E-Mail-Adresse ein.', preview:'Dies ist eine lokale Designvorschau. Es wurde keine Nachricht gesendet oder gespeichert.', opened:'Ihr E-Mail-Programm sollte sich mit der vorbereiteten Anfrage \u00f6ffnen. Bitte senden Sie diese dort ab.', photograph:' Fotografie', photographs:' Fotografien', menuOpen:'Men\u00fc \u00f6ffnen', menuClose:'Men\u00fc schlie\u00dfen'}
+};
+const M = MESSAGES[LOCALE] || MESSAGES.en;
+
+const header = document.getElementById('siteHeader');
+const menuToggle = document.getElementById('menuToggle');
+const nav = document.getElementById('primaryNav');
+const line = document.querySelector('.reading-line');
+
+function refreshScroll() {
+  const y = window.scrollY;
+  header.classList.toggle('is-scrolled', y > 36);
+  const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+  line.style.width = (scrollable > 0 ? Math.min(100, Math.max(0, y / scrollable * 100)) : 0) + '%';
+}
+window.addEventListener('scroll', refreshScroll, { passive: true });
+refreshScroll();
+
+function closeMenu() {
+  header.classList.remove('menu-open');
+  document.body.classList.remove('menu-open');
+  menuToggle.setAttribute('aria-expanded', 'false');
+  menuToggle.setAttribute('aria-label', M.menuOpen);
+}
+menuToggle.addEventListener('click', () => {
+  const open = !header.classList.contains('menu-open');
+  header.classList.toggle('menu-open', open);
+  document.body.classList.toggle('menu-open', open);
+  menuToggle.setAttribute('aria-expanded', String(open));
+  menuToggle.setAttribute('aria-label', open ? M.menuClose : M.menuOpen);
+});
+nav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && header.classList.contains('menu-open')) closeMenu();
+});
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 960) closeMenu();
+});
+
+if ('IntersectionObserver' in window) {
+  const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: .085, rootMargin: '0px 0px -15px 0px' });
+  document.querySelectorAll('.reveal').forEach(element => observer.observe(element));
+} else {
+  document.querySelectorAll('.reveal').forEach(element => element.classList.add('visible'));
+}
+
+const filterButtons = Array.from(document.querySelectorAll('.filter-button'));
+const galleryItems = Array.from(document.querySelectorAll('.gallery-item'));
+const galleryCount = document.getElementById('galleryCount');
+let visibleItems = galleryItems;
+let currentIndex = 0;
+
+function applyGalleryFilter(category) {
+  visibleItems = galleryItems.filter(item => category === 'all' || item.dataset.category === category);
+  galleryItems.forEach(item => { item.hidden = !visibleItems.includes(item); });
+  filterButtons.forEach(button => {
+    const active = button.dataset.filter === category;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  galleryCount.textContent = visibleItems.length + (visibleItems.length === 1 ? M.photograph : M.photographs);
+}
+filterButtons.forEach(button => button.addEventListener('click', () => applyGalleryFilter(button.dataset.filter)));
+
+const lightbox = document.getElementById('photoLightbox');
+const lightboxTitle = document.getElementById('lightboxTitle');
+const lightboxImage = document.getElementById('lightboxImage');
+const lightboxDescription = document.getElementById('lightboxDesc');
+const lightboxCounter = document.getElementById('lightboxCounter');
+const lightboxClose = document.getElementById('lightboxClose');
+
+function showPhoto(index) {
+  if (!visibleItems.length) return;
+  currentIndex = (index + visibleItems.length) % visibleItems.length;
+  const item = visibleItems[currentIndex];
+  lightboxImage.src = item.dataset.image;
+  lightboxImage.alt = item.querySelector('img').alt;
+  lightboxTitle.textContent = item.dataset.title;
+  lightboxDescription.textContent = item.dataset.description;
+  lightboxCounter.textContent = String(currentIndex + 1).padStart(2, '0') + ' / ' + String(visibleItems.length).padStart(2, '0');
+}
+
+galleryItems.forEach(item => item.addEventListener('click', () => {
+  showPhoto(visibleItems.indexOf(item));
+  if (!lightbox.open) lightbox.showModal();
+  document.body.classList.add('dialog-open');
+}));
+
+function closeLightbox() {
+  lightbox.close();
+  document.body.classList.remove('dialog-open');
+  lightboxImage.removeAttribute('src');
+}
+lightboxClose.addEventListener('click', closeLightbox);
+document.getElementById('lightboxPrevious').addEventListener('click', () => showPhoto(currentIndex - 1));
+document.getElementById('lightboxNext').addEventListener('click', () => showPhoto(currentIndex + 1));
+lightbox.addEventListener('click', event => { if (event.target === lightbox) closeLightbox(); });
+lightbox.addEventListener('close', () => document.body.classList.remove('dialog-open'));
+document.addEventListener('keydown', event => {
+  if (!lightbox.open) return;
+  if (event.key === 'ArrowLeft') { event.preventDefault(); showPhoto(currentIndex - 1); }
+  if (event.key === 'ArrowRight') { event.preventDefault(); showPhoto(currentIndex + 1); }
+});
+
+document.getElementById('currentYear').textContent = String(new Date().getFullYear());
